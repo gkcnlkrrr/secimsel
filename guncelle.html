@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Panoyu güncelle</title>
+<style>
+:root{--paper:#EEF2EE;--surface:#FFFFFF;--ink:#13241B;--muted:#5B6B62;--rule:#D3DCD5;--brand:#16402F;--err:#B5403A;--ok:#2F8F5B;--warn:#A9741F}
+@media (prefers-color-scheme:dark){:root{--paper:#0F1A15;--surface:#16241D;--ink:#E7EFEA;--muted:#93A69B;--rule:#2A3A31;--brand:#7FC4A0;--err:#E0675F;--ok:#4CB97D;--warn:#E0A84A}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.5 Barlow,"Segoe UI",Roboto,Arial,sans-serif}
+main{max-width:34rem;margin:0 auto;padding:1.5rem 1.25rem 3rem}
+h1{font-size:1.3rem;margin:0 0 .25rem;color:var(--brand)}
+h2{font-size:1rem;margin:0 0 .5rem}
+p{margin:.3rem 0}
+.muted{color:var(--muted);font-size:.92rem}
+.box{margin-top:1.25rem;background:var(--surface);border:1px solid var(--rule);border-radius:.75rem;padding:1rem 1.1rem}
+.drop{display:block;border:2px dashed var(--rule);border-radius:.75rem;padding:1.75rem 1rem;text-align:center;cursor:pointer}
+.drop.over{border-color:var(--brand)}
+.drop:focus-within{outline:3px solid var(--brand);outline-offset:2px}
+input[type=file]{position:absolute;width:1px;height:1px;opacity:0}
+input[type=password]{width:100%;font:inherit;padding:.6rem .7rem;border:1.5px solid var(--rule);border-radius:.5rem;background:var(--paper);color:var(--ink)}
+table{border-collapse:collapse;width:100%;margin-top:.75rem}
+td{padding:.5rem .2rem;border-top:1px solid var(--rule)}
+tr:first-child td{border-top:0}
+td:last-child{text-align:right;font-weight:600;font-variant-numeric:tabular-nums;font-size:1.15rem}
+.acts{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.9rem;align-items:center}
+button{font:inherit;font-weight:600;border-radius:.55rem;padding:.65rem 1.1rem;border:1.5px solid var(--brand);background:transparent;color:var(--brand);cursor:pointer}
+button.primary{background:var(--brand);color:var(--surface)}
+button.link{border:0;padding:0;font-weight:500;text-decoration:underline;color:var(--muted)}
+button:disabled{opacity:.5;cursor:default}
+button:focus-visible{outline:3px solid var(--brand);outline-offset:2px}
+.msg{margin-top:.75rem;font-size:.95rem}
+.err{color:var(--err)} .ok{color:var(--ok)} .warn{color:var(--warn)}
+a{color:var(--brand)}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main>
+  <h1>Panoyu güncelle</h1>
+  <p class="muted">Excel bu sayfadan hiçbir yere gönderilmez; yalnızca dört sayı panoya yazılır. <a href="./" target="_blank" rel="noopener">Panoyu aç</a></p>
+
+  <section class="box" id="tokenBox" hidden>
+    <h2>GitHub anahtarı</h2>
+    <p class="muted">Bir kez girilir, bu tarayıcıda saklanır.</p>
+    <input type="password" id="tok" placeholder="github_pat_…" autocomplete="off" spellcheck="false">
+    <div class="acts"><button class="primary" id="saveTok">Kaydet</button></div>
+    <div class="msg" id="tokMsg" role="status"></div>
+  </section>
+
+  <section id="mainBox" hidden>
+    <label class="drop box" id="drop"><input type="file" id="f" accept=".xlsx,.xlsm,.xls"><strong>Canlı Takip Excel'ini seçin</strong><br><span class="muted">ya da buraya sürükleyin</span></label>
+
+    <section class="box" id="res" hidden>
+      <h2 id="fname"></h2>
+      <table id="tbl"></table>
+      <div class="acts"><button class="primary" id="pub">Yayınla</button></div>
+    </section>
+
+    <div class="msg" id="msg" role="status"></div>
+    <p class="muted" style="margin-top:1.5rem" id="lastInfo"></p>
+    <p style="margin-top:.5rem"><button class="link" id="forget">Anahtarı bu tarayıcıdan sil</button></p>
+  </section>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+(function(){
+  var OWNER='gkcnlkrrr', REPO='secimsel', PATH='data.json', BRANCH='main';
+  var MIN_GAP=5*60*1000; // GitHub Pages saatlik yayın sınırına takılmamak için
+  var API='https://api.github.com/repos/'+OWNER+'/'+REPO+'/contents/'+PATH;
+  var K_TOK='izto_gh_token', K_LAST='izto_last_publish';
+  var $=function(id){ return document.getElementById(id); };
+  var pending=null, timer=null;
+
+  function store(k,v){ try{ if(v==null) localStorage.removeItem(k); else localStorage.setItem(k,v); }catch(e){} }
+  function read(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+  function say(t,cls){ $('msg').textContent=t; $('msg').className='msg'+(cls?' '+cls:''); }
+  function saat(d){ return (d||new Date()).toLocaleString('tr-TR',{timeZone:'Europe/Istanbul',day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'}); }
+
+  function showState(){
+    var has=!!read(K_TOK);
+    $('tokenBox').hidden=has; $('mainBox').hidden=!has;
+    var last=Number(read(K_LAST)||0);
+    $('lastInfo').textContent= last ? 'Son yayın: '+saat(new Date(last)) : '';
+  }
+
+  function hdr(t){ return {'Authorization':'Bearer '+t,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'}; }
+  function errText(s){
+    if(s===401) return 'Anahtar geçersiz ya da süresi dolmuş. Yeni anahtar oluşturup girin.';
+    if(s===403||s===404) return 'Anahtarın bu depoya yazma yetkisi yok. Anahtarı oluştururken "secimsel" deposunu ve Contents: Read and write iznini seçtiğinizden emin olun.';
+    return 'GitHub hata verdi ('+s+'). Biraz sonra tekrar deneyin.';
+  }
+
+  // ---- anahtar
+  $('saveTok').addEventListener('click',function(){
+    var t=$('tok').value.trim(), m=$('tokMsg');
+    if(!t){ m.textContent='Anahtarı yapıştırın.'; m.className='msg err'; return; }
+    $('saveTok').disabled=true; m.textContent='Kontrol ediliyor…'; m.className='msg';
+    fetch('https://api.github.com/repos/'+OWNER+'/'+REPO,{headers:hdr(t)}).then(function(r){
+      if(!r.ok) throw {status:r.status};
+      return r.json();
+    }).then(function(repo){
+      $('saveTok').disabled=false;
+      if(!repo.permissions || !repo.permissions.push){ m.textContent=errText(403); m.className='msg err'; return; }
+      store(K_TOK,t); $('tok').value=''; m.textContent=''; showState(); say('Anahtar kaydedildi. Excel\'i seçebilirsiniz.','ok');
+    }).catch(function(e){
+      $('saveTok').disabled=false; m.className='msg err';
+      m.textContent= e && e.status ? errText(e.status) : 'GitHub\'a ulaşılamadı. Bağlantıyı kontrol edin.';
+    });
+  });
+  $('forget').addEventListener('click',function(){ store(K_TOK,null); showState(); say(''); });
+
+  // ---- Excel okuma
+  function countFromWorkbook(wb){
+    var norm=function(s){ return String(s==null?'':s).replace(/\s+/g,' ').trim().toLocaleUpperCase('tr-TR'); };
+    var ws=wb.Sheets['Canlı Takip'];
+    if(!ws){ for(var i=0;i<wb.SheetNames.length;i++){ var r=(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[i]],{header:1,blankrows:false})[0]||[]).map(norm); if(r.indexOf('DURUM')>=0&&r.indexOf('FİRMA ÜNVANI')>=0){ ws=wb.Sheets[wb.SheetNames[i]]; break; } } }
+    if(!ws) throw new Error('"Canlı Takip" sayfası bulunamadı. Doğru Excel dosyasını seçin.');
+    var rows=XLSX.utils.sheet_to_json(ws,{header:1,blankrows:false,defval:''});
+    var h=(rows[0]||[]).map(norm), fi=h.indexOf('FİRMA ÜNVANI'), di=h.indexOf('DURUM');
+    if(fi<0||di<0) throw new Error('"Firma Ünvanı" veya "Durum" başlığı bulunamadı. Başlık satırını değiştirmeyin.');
+    var c={toplam:0,oy:0,bek:0,gel:0,geldi:0,diger:0};
+    rows.slice(1).forEach(function(r){
+      if(!String(r[fi]).trim()) return; c.toplam++;
+      var d=norm(r[di]);
+      if(d==='OY KULLANDI') c.oy++; else if(d==='BEKLENİYOR'||d==='') c.bek++;
+      else if(d==='GELMİYOR') c.gel++; else if(d==='GELDİ') c.geldi++; else c.diger++;
+    });
+    if(!c.toplam) throw new Error('Listede firma bulunamadı.');
+    return c;
+  }
+
+  function handle(file){
+    if(!file) return;
+    if(!window.XLSX){ say('Excel okuyucu yüklenemedi. Sayfayı yenileyin.','err'); return; }
+    $('res').hidden=true; say('Okunuyor…');
+    file.arrayBuffer().then(function(buf){
+      var c=countFromWorkbook(XLSX.read(buf,{type:'array'}));
+      pending=c;
+      $('fname').textContent=file.name;
+      $('tbl').innerHTML='<tr><td>Toplam firma</td><td>'+c.toplam+'</td></tr><tr><td>Oy kullandı</td><td>'+c.oy+'</td></tr>'
+        +'<tr><td>Bekleniyor</td><td>'+c.bek+'</td></tr><tr><td>Gelmiyor</td><td>'+c.gel+'</td></tr>'
+        +(c.geldi?'<tr><td>Geldi</td><td>'+c.geldi+'</td></tr>':'');
+      $('res').hidden=false;
+      if(timer){ say('Yeni Excel okundu; bekleyen yayın bu sayılarla yapılacak.','warn'); }
+      else { $('pub').disabled=false; say(c.diger ? 'Dikkat: '+c.diger+' satırda tanınmayan durum var, sayılara katılmadı.' : 'Sayılar doğruysa yayınlayın.', c.diger?'err':''); }
+    }).catch(function(e){ say((e&&e.message)||'Dosya okunamadı.','err'); });
+  }
+  $('f').addEventListener('change',function(){ handle($('f').files[0]); $('f').value=''; });
+  ['dragenter','dragover'].forEach(function(ev){ $('drop').addEventListener(ev,function(e){ e.preventDefault(); $('drop').classList.add('over'); }); });
+  ['dragleave','drop'].forEach(function(ev){ $('drop').addEventListener(ev,function(e){ e.preventDefault(); $('drop').classList.remove('over'); }); });
+  $('drop').addEventListener('drop',function(e){ handle(e.dataTransfer.files[0]); });
+
+  // ---- yayınlama
+  function b64(str){ var bytes=new TextEncoder().encode(str), bin=''; for(var i=0;i<bytes.length;i++) bin+=String.fromCharCode(bytes[i]); return btoa(bin); }
+
+  function push(c, retried){
+    var tok=read(K_TOK); if(!tok){ showState(); return Promise.reject({status:401}); }
+    var data={toplam:c.toplam,oy_kullandi:c.oy,bekleniyor:c.bek,gelmiyor:c.gel,geldi:c.geldi,guncelleme:saat()};
+    var text=JSON.stringify(data,null,2)+'\n';
+    return fetch(API+'?ref='+BRANCH+'&t='+Date.now(),{headers:hdr(tok),cache:'no-store'}).then(function(r){
+      if(!r.ok) throw {status:r.status};
+      return r.json();
+    }).then(function(cur){
+      return fetch(API,{method:'PUT',headers:Object.assign({'Content-Type':'application/json'},hdr(tok)),
+        body:JSON.stringify({message:'Pano güncellendi: '+data.guncelleme,content:b64(text),sha:cur.sha,branch:BRANCH})});
+    }).then(function(r){
+      if(r.status===409 && !retried) return push(c,true);
+      if(!r.ok) throw {status:r.status};
+      store(K_LAST,String(Date.now())); showState();
+    });
+  }
+
+  function publishNow(){
+    var c=pending; if(!c) return;
+    $('pub').disabled=true; say('Yayınlanıyor…');
+    push(c).then(function(){
+      $('pub').disabled=false;
+      say('Yayınlandı. Pano yaklaşık 1–2 dakikada güncellenir.','ok');
+    }).catch(function(e){
+      $('pub').disabled=false;
+      var st=e&&e.status;
+      say(st ? errText(st) : 'GitHub\'a ulaşılamadı. Bağlantıyı kontrol edip tekrar deneyin.','err');
+      if(st===401){ store(K_TOK,null); showState(); }
+    });
+  }
+
+  $('pub').addEventListener('click',function(){
+    if(!pending || timer) return;
+    var wait=Number(read(K_LAST)||0)+MIN_GAP-Date.now();
+    if(wait<=0) return publishNow();
+    $('pub').disabled=true;
+    function tick(){
+      var left=Number(read(K_LAST)||0)+MIN_GAP-Date.now();
+      if(left<=0){ clearInterval(timer); timer=null; publishNow(); return; }
+      var sec=Math.ceil(left/1000), m=Math.floor(sec/60), s=sec%60;
+      say('Son yayından beri 5 dakika geçmedi. '+m+' dk '+s+' sn sonra kendiliğinden yayınlanacak; sayfayı kapatmayın. Bu arada yeni Excel seçerseniz en son seçilen yayınlanır.','warn');
+    }
+    tick(); timer=setInterval(tick,1000);
+  });
+
+  showState();
+})();
+</script>
+</body>
+</html>
