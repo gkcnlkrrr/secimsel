@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>İZTO 82 seçim takibi</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗳️</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#EEF2EE; --surface:#FFFFFF; --ink:#13241B; --muted:#5B6B62; --rule:#D3DCD5;
+  --brand:#16402F; --oy:#2F8F5B; --bek:#C08A2E; --gel:#B5403A; --geldi:#3E7CB1; --track:#DCE4DE;
+  box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){ :root{
+  --paper:#0F1A15; --surface:#16241D; --ink:#E7EFEA; --muted:#93A69B; --rule:#2A3A31;
+  --brand:#7FC4A0; --oy:#4CB97D; --bek:#E0A84A; --gel:#E0675F; --geldi:#6FA8DA; --track:#22332A; } }
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:Barlow,"Segoe UI",Roboto,Arial,sans-serif;font-size:16px;line-height:1.45;-webkit-font-smoothing:antialiased}
+main{max-width:30rem;margin:0 auto;padding:1.25rem 1.25rem 2rem}
+.top{display:flex;align-items:baseline;justify-content:space-between;gap:1rem;border-bottom:2px solid var(--brand);padding-bottom:.6rem}
+.top h1{margin:0;font-family:"Barlow Semi Condensed",Barlow,Arial,sans-serif;font-weight:600;font-size:1.15rem;color:var(--brand)}
+.live{font-size:.8rem;color:var(--muted);display:flex;align-items:center;gap:.4rem;white-space:nowrap}
+.dot{width:.5rem;height:.5rem;border-radius:50%;background:var(--oy);display:inline-block}
+.live.stale .dot{background:var(--bek)}
+.hero{padding:2rem 0 1.25rem}
+.big{font-family:"Barlow Semi Condensed",Barlow,Arial,sans-serif;font-weight:700;font-variant-numeric:tabular-nums;line-height:.9;display:flex;align-items:baseline;gap:.35rem;margin:0}
+.big .n{font-size:clamp(5rem,30vw,8.5rem);color:var(--oy)}
+.big .of{font-size:clamp(1.8rem,9vw,2.6rem);color:var(--muted);font-weight:500}
+.hero p{margin:.6rem 0 0;font-size:1.05rem}
+.hero p span{color:var(--muted)}
+.bar{display:flex;height:.9rem;border-radius:.45rem;overflow:hidden;background:var(--track);margin-top:1.4rem}
+.bar i{display:block;height:100%}
+.rows{list-style:none;margin:.5rem 0 0;padding:0;background:var(--surface);border-radius:.75rem;border:1px solid var(--rule)}
+.rows li{display:flex;align-items:center;gap:.75rem;padding:1rem 1.1rem;border-top:1px solid var(--rule)}
+.rows li:first-child{border-top:0}
+.sw{width:.8rem;height:.8rem;border-radius:.2rem;flex:none}
+.lb{flex:1;font-size:1.05rem}
+.v{font-family:"Barlow Semi Condensed",Barlow,Arial,sans-serif;font-weight:600;font-size:1.9rem;font-variant-numeric:tabular-nums;line-height:1}
+.total .lb{font-weight:600}
+.total .v{color:var(--brand)}
+.stamp{margin:1.1rem 0 0;font-size:.85rem;color:var(--muted);text-align:center}
+.warn{margin:1rem 0 0;font-size:.85rem;color:var(--gel);text-align:center}
+.empty{padding:3rem 0;text-align:center;color:var(--muted)}
+@media (prefers-reduced-motion:no-preference){.bar i{transition:width .6s ease}}
+</style>
+</head>
+<body>
+<main>
+  <header class="top"><h1>İZTO 82 seçim takibi</h1><span class="live" id="live"><span class="dot"></span>Seçim günü</span></header>
+  <div id="view"><p class="empty">Yükleniyor…</p></div>
+  <p class="warn" id="warn" hidden></p>
+</main>
+<script>
+(function(){
+  var view=document.getElementById('view'), warn=document.getElementById('warn'), live=document.getElementById('live');
+  var last=null;
+  function num(x){ x=Number(x); return isFinite(x)&&x>=0 ? Math.round(x) : 0; }
+  function pct(a,b){ return b ? a/b*100 : 0; }
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+
+  function render(raw){
+    var d={toplam:num(raw.toplam),oy:num(raw.oy_kullandi),bek:num(raw.bekleniyor),gel:num(raw.gelmiyor),geldi:num(raw.geldi),saat:raw.guncelleme};
+    var t=d.toplam;
+    var segs=[['oy',d.oy],['geldi',d.geldi],['bek',d.bek],['gel',d.gel]];
+    var bar=segs.map(function(s){ return s[1] ? '<i style="width:'+pct(s[1],t)+'%;background:var(--'+s[0]+')"></i>' : ''; }).join('');
+    view.innerHTML=
+      '<section class="hero" aria-label="Oy kullanan firma"><p class="big"><span class="n">'+d.oy+'</span><span class="of">/ '+t+'</span></p>'
+      +'<p>firma oy kullandı <span>(%'+Math.round(pct(d.oy,t))+')</span></p>'
+      +'<div class="bar" role="img" aria-label="Oy kullandı '+d.oy+', bekleniyor '+d.bek+', gelmiyor '+d.gel+'">'+bar+'</div></section>'
+      +'<ul class="rows">'
+      +'<li class="total"><span class="sw" style="background:var(--brand)"></span><span class="lb">Toplam firma</span><span class="v">'+t+'</span></li>'
+      +'<li><span class="sw" style="background:var(--oy)"></span><span class="lb">Oy kullandı</span><span class="v">'+d.oy+'</span></li>'
+      +(d.geldi?'<li><span class="sw" style="background:var(--geldi)"></span><span class="lb">Geldi, henüz oy kullanmadı</span><span class="v">'+d.geldi+'</span></li>':'')
+      +'<li><span class="sw" style="background:var(--bek)"></span><span class="lb">Bekleniyor</span><span class="v">'+d.bek+'</span></li>'
+      +'<li><span class="sw" style="background:var(--gel)"></span><span class="lb">Gelmiyor</span><span class="v">'+d.gel+'</span></li>'
+      +'</ul>'
+      +(d.saat?'<p class="stamp">Son güncelleme: '+esc(d.saat)+'</p>':'');
+  }
+
+  function load(){
+    fetch('data.json?t='+Date.now(),{cache:'no-store'})
+      .then(function(r){ if(!r.ok) throw new Error('http'); return r.json(); })
+      .then(function(j){ last=j; render(j); warn.hidden=true; live.classList.remove('stale'); })
+      .catch(function(){
+        live.classList.add('stale');
+        warn.hidden=false;
+        warn.textContent = last ? 'Yeni veri alınamadı; son bilinen sayılar gösteriliyor. Sayfa kendini yeniden deneyecek.'
+                                : 'Veri okunamadı. Bağlantıyı kontrol edip sayfayı yenileyin.';
+        if(!last) view.innerHTML='';
+      });
+  }
+  load();
+  setInterval(function(){ if(document.visibilityState==='visible') load(); },60000);
+  document.addEventListener('visibilitychange',function(){ if(document.visibilityState==='visible') load(); });
+})();
+</script>
+</body>
+</html>
